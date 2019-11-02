@@ -30,7 +30,8 @@ const App: React.FC = () => {
   const rtc = new RTCPeerConnection({
 	  iceServers,
   });
-  const socket = io('http://192.168.208.127:3000', {
+  const socket = io('https://www.xingyibiao.com/', {
+    path: '/chat/socket.io',
     forceNew: true,
     reconnection: false,
     transports: ['websocket'],
@@ -153,7 +154,7 @@ const App: React.FC = () => {
   		rtc.addTrack(track, localStream);
 	  });
     if (isPublisher) {
-      createOffer();
+      createOffer().catch(() => createAnswer());
     } else {
       createAnswer();
     }
@@ -177,7 +178,7 @@ const App: React.FC = () => {
       <button onClick={publishStream}>发布流</button>
       <span>{cameraId}</span>
       <video ref={videoRef} width="500" height="500" autoPlay={true} muted/>
-      <video ref={remoteVideoRef} width="250" height="250" autoPlay={true}/>
+      <video ref={remoteVideoRef} width="500" height="500" autoPlay={true}/>
     </div>
   );
 }
