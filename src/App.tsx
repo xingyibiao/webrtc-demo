@@ -2,6 +2,7 @@ import React, {useRef, useState} from 'react';
 import io from 'socket.io-client';
 
 import iceServers from './iceServe';
+import { SOCKET_URL, SOCKET_PATH } from './config';
 
 type SdpMsg = SocketMsg<RTCSessionDescription>
 
@@ -16,6 +17,7 @@ type SocketMsg<T = any> = {
 const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const callBtnRef = useRef<HTMLButtonElement>(null);
   const [cameraId, setCameraId] = useState('');
   const [userName, setUserName] = useState('');
   const [roomName, setRoomName] = useState('');
@@ -30,12 +32,12 @@ const App: React.FC = () => {
   const rtc = new RTCPeerConnection({
 	  iceServers,
   });
-  const socket = io('https://www.xingyibiao.com/', {
-    path: '/chat/socket.io',
+  console.log(SOCKET_URL, SOCKET_PATH);
+  const socket = io(SOCKET_URL, {
+    path: SOCKET_PATH,
     forceNew: true,
     reconnection: false,
     transports: ['websocket'],
-	  rejectUnauthorized: false,
   });
 
   rtc.addEventListener('track', (e) => {
@@ -45,13 +47,13 @@ const App: React.FC = () => {
   	remoteStream = e.streams[0];
   	if (video$ && video$.srcObject !== e.streams[0]) {
   		console.log(localStream, remoteStream);
-  		video$.srcObject = localStream;
+  		video$.srcObject = remoteStream;
 	  }
   });
 
   rtc.addEventListener('icecandidate', (e) => {
   	console.log('ice', e);
-  	socket.emit('candidate', e);
+  	socket.emit('candidate', e.candidate);
   });
 
   async function createOffer() {
@@ -96,16 +98,25 @@ const App: React.FC = () => {
   socket.on('candidate', async (e: CandidateMsg) => {
   	const { sender, data } = e;
   	if (sender === userName) return;
-  	if (!data.candidate) {
+  	if (!data) {
   		// playRemote();
   		return;
 	  }
   	try {
   		console.log(data);
-  	  await rtc.addIceCandidate(data.candidate);
+  	  await rtc.addIceCandidate(data as any);
 	  } catch (e) {
 		  console.error(e);
 	  }
+  });
+
+  socket.on('call', (e: SocketMsg) => {
+  	const { sender } = e;
+  	if (sender === userName) return;
+  	const callBtn$ = callBtnRef.current;
+  	if (callBtn$) callBtn$.disabled = true;
+  	isPublisher = false;
+  	publishStream();
   });
 
   function handlerGetCamera() {
@@ -124,9 +135,6 @@ const App: React.FC = () => {
           if (videoRef.current) {
             videoRef.current.srcObject = e;
             localStream = e;
-            // e.getTracks().forEach((track) => {
-            // 	rtc.addTrack(track);
-            // })
           }
         })
         .catch((e) => {
@@ -147,17 +155,23 @@ const App: React.FC = () => {
   });
 
 
-  function publishStream() {
+  async function publishStream() {
   	if (!localStream) return;
   	localStream.getTracks().forEach((track) => {
   	  if (!localStream) return;
   		rtc.addTrack(track, localStream);
 	  });
     if (isPublisher) {
-      createOffer().catch(() => createAnswer());
+      await createOffer();
     } else {
-      createAnswer();
+      await createAnswer();
     }
+  }
+
+  async function call() {
+  	isPublisher = true;
+	  await publishStream();
+	  socket.emit('call');
   }
 
   function playRemote() {
@@ -175,7 +189,7 @@ const App: React.FC = () => {
       <button onClick={handlerGetCamera}>获取摄像头</button>
       <button onClick={getLocalStream}>采集本地视频</button>
       <button onClick={loginRoom}>登录房间</button>
-      <button onClick={publishStream}>发布流</button>
+      <button ref={callBtnRef} onClick={call}>call</button>
       <span>{cameraId}</span>
       <video ref={videoRef} width="500" height="500" autoPlay={true} muted/>
       <video ref={remoteVideoRef} width="500" height="500" autoPlay={true}/>
