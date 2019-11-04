@@ -14,6 +14,14 @@ type SocketMsg<T = any> = {
 }
 
 
+const socket = io(SOCKET_URL, {
+	path: SOCKET_PATH,
+	forceNew: true,
+	reconnection: false,
+	transports: ['websocket'],
+});
+
+
 const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -33,26 +41,18 @@ const App: React.FC = () => {
 	  iceServers,
   });
   console.log(SOCKET_URL, SOCKET_PATH);
-  const socket = io(SOCKET_URL, {
-    path: SOCKET_PATH,
-    forceNew: true,
-    reconnection: false,
-    transports: ['websocket'],
-  });
+
 
   rtc.addEventListener('track', (e) => {
   	console.log('远端track增加', e.streams);
   	const video$ = remoteVideoRef.current;
-  	console.log(video$);
   	remoteStream = e.streams[0];
   	if (video$ && video$.srcObject !== e.streams[0]) {
-  		console.log(localStream, remoteStream);
   		video$.srcObject = remoteStream;
 	  }
   });
 
   rtc.addEventListener('icecandidate', (e) => {
-  	console.log('ice', e);
   	socket.emit('candidate', e.candidate);
   });
 
@@ -61,7 +61,6 @@ const App: React.FC = () => {
     try {
       const offer = await rtc.createOffer();
       hasPublish = true;
-      console.log('创建offer', offer);
       if (offer.sdp) {
         await rtc.setLocalDescription(offer);
         socket.emit('send_sdp', offer);
@@ -76,11 +75,9 @@ const App: React.FC = () => {
     try {
       const answer = await rtc.createAnswer();
       hasPublish = true;
-      console.log('创建answer', answer);
       if (answer.sdp) {
         await rtc.setLocalDescription(answer);
         socket.emit('send_sdp', answer);
-	      // playRemote();
       }
     } catch (e) {
       console.error(e);
@@ -92,32 +89,9 @@ const App: React.FC = () => {
     console.log('收到sdp', e);
     if (sender === userName) return;
     await rtc.setRemoteDescription(data);
-    // createAnswer();
   });
 
-  socket.on('candidate', async (e: CandidateMsg) => {
-  	const { sender, data } = e;
-  	if (sender === userName) return;
-  	if (!data) {
-  		// playRemote();
-  		return;
-	  }
-  	try {
-  		console.log(data);
-  	  await rtc.addIceCandidate(data as any);
-	  } catch (e) {
-		  console.error(e);
-	  }
-  });
 
-  socket.on('call', (e: SocketMsg) => {
-  	const { sender } = e;
-  	if (sender === userName) return;
-  	const callBtn$ = callBtnRef.current;
-  	if (callBtn$) callBtn$.disabled = true;
-  	isPublisher = false;
-  	publishStream();
-  });
 
   function handlerGetCamera() {
     navigator.getUserMedia({ video: true }, (e) => {
@@ -195,6 +169,6 @@ const App: React.FC = () => {
       <video ref={remoteVideoRef} width="500" height="500" autoPlay={true}/>
     </div>
   );
-}
+};
 
 export default App;
