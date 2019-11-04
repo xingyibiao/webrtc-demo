@@ -91,7 +91,29 @@ const App: React.FC = () => {
     await rtc.setRemoteDescription(data);
   });
 
+  socket.on('candidate', async (e: CandidateMsg) => {
+  	const { sender, data } = e;
+  	if (sender === userName) return;
+  	if (!data) {
+  		// playRemote();
+  		return;
+	  }
+  	try {
+  		console.log(data);
+  	  await rtc.addIceCandidate(data as any);
+	  } catch (e) {
+		  console.error(e);
+	  }
+  });
 
+  socket.on('call', (e: SocketMsg) => {
+  	const { sender } = e;
+  	if (sender === userName) return;
+  	const callBtn$ = callBtnRef.current;
+  	if (callBtn$) callBtn$.disabled = true;
+  	isPublisher = false;
+  	publishStream();
+  });
 
   function handlerGetCamera() {
     navigator.getUserMedia({ video: true }, (e) => {
