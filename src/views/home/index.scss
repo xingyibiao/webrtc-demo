@@ -1,0 +1,27 @@
+.App{
+  display: flex;
+  height: 100vh;
+  .left{}
+  .center{
+    flex-grow: 1;
+  }
+  .right{
+    display: flex;
+    width: 200px;
+    flex-direction: column;
+    .video--wrap{
+      position: relative;
+      width: 200px;
+      height: 150px;
+      background-color: #000;
+      video{
+        position: absolute;
+        right: 0;
+        bottom: 0;
+      }
+    }
+    .chat--list{
+      flex-grow: 1;
+    }
+  }
+}

@@ -1,0 +1,19 @@
+.login{
+  display: flex;
+  height: 100vh;
+  justify-content: center;
+  align-items: center;
+  .loginForm{
+    width: 400px;
+    height: 500px;
+    margin: 0 auto;
+    h1{
+      text-align: center;
+    }
+    .form--item{
+      width: 300px;
+      margin: 10px auto;
+      text-align: center;
+    }
+  }
+}
