@@ -1,26 +1,24 @@
-import React, {useRef, useState} from 'react';
+import React, { useRef, useState } from 'react';
 import io from 'socket.io-client';
 
-import iceServers from './iceServe';
-import { SOCKET_URL, SOCKET_PATH } from './config';
+import iceServers from './services/iceServe';
+import { SOCKET_URL, SOCKET_PATH } from './services/config';
 
-type SdpMsg = SocketMsg<RTCSessionDescription>
+type SdpMsg = SocketMsg<RTCSessionDescription>;
 
-type CandidateMsg = SocketMsg<RTCPeerConnectionIceEvent>
+type CandidateMsg = SocketMsg<RTCPeerConnectionIceEvent>;
 
 type SocketMsg<T = any> = {
-	data: T,
-	sender: string,
-}
-
+  data: T;
+  sender: string;
+};
 
 const socket = io(SOCKET_URL, {
-	path: SOCKET_PATH,
-	forceNew: true,
-	reconnection: false,
-	transports: ['websocket'],
+  path: SOCKET_PATH,
+  forceNew: true,
+  reconnection: false,
+  transports: ['websocket'],
 });
-
 
 const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -38,26 +36,25 @@ const App: React.FC = () => {
   let hasPublish: boolean = false;
 
   const rtc = new RTCPeerConnection({
-	  iceServers,
+    iceServers,
   });
   console.log(SOCKET_URL, SOCKET_PATH);
 
-
-  rtc.addEventListener('track', (e) => {
-  	console.log('远端track增加', e.streams);
-  	const video$ = remoteVideoRef.current;
-  	remoteStream = e.streams[0];
-  	if (video$ && video$.srcObject !== e.streams[0]) {
-  		video$.srcObject = remoteStream;
-	  }
+  rtc.addEventListener('track', e => {
+    console.log('远端track增加', e.streams);
+    const video$ = remoteVideoRef.current;
+    remoteStream = e.streams[0];
+    if (video$ && video$.srcObject !== e.streams[0]) {
+      video$.srcObject = remoteStream;
+    }
   });
 
-  rtc.addEventListener('icecandidate', (e) => {
-  	socket.emit('candidate', e.candidate);
+  rtc.addEventListener('icecandidate', e => {
+    socket.emit('candidate', e.candidate);
   });
 
   async function createOffer() {
-  	if (hasPublish) return;
+    if (hasPublish) return;
     try {
       const offer = await rtc.createOffer();
       hasPublish = true;
@@ -71,7 +68,7 @@ const App: React.FC = () => {
   }
 
   async function createAnswer() {
-  	if (hasPublish) return;
+    if (hasPublish) return;
     try {
       const answer = await rtc.createAnswer();
       hasPublish = true;
@@ -92,50 +89,54 @@ const App: React.FC = () => {
   });
 
   socket.on('candidate', async (e: CandidateMsg) => {
-  	const { sender, data } = e;
-  	if (sender === userName) return;
-  	if (!data) {
-  		// playRemote();
-  		return;
-	  }
-  	try {
-  		console.log(data);
-  	  await rtc.addIceCandidate(data as any);
-	  } catch (e) {
-		  console.error(e);
-	  }
+    const { sender, data } = e;
+    if (sender === userName) return;
+    if (!data) {
+      // playRemote();
+      return;
+    }
+    try {
+      console.log(data);
+      await rtc.addIceCandidate(data as any);
+    } catch (e) {
+      console.error(e);
+    }
   });
 
   socket.on('call', (e: SocketMsg) => {
-  	const { sender } = e;
-  	if (sender === userName) return;
-  	const callBtn$ = callBtnRef.current;
-  	if (callBtn$) callBtn$.disabled = true;
-  	isPublisher = false;
-  	publishStream();
+    const { sender } = e;
+    if (sender === userName) return;
+    const callBtn$ = callBtnRef.current;
+    if (callBtn$) callBtn$.disabled = true;
+    isPublisher = false;
+    publishStream();
   });
 
   function handlerGetCamera() {
-    navigator.getUserMedia({ video: true }, (e) => {
-      console.log(e);
-      setCameraId(e.id);
-
-    }, (e) => {
-      console.error(e)
-    })
+    navigator.getUserMedia(
+      { video: true },
+      e => {
+        console.log(e);
+        setCameraId(e.id);
+      },
+      e => {
+        console.error(e);
+      },
+    );
   }
 
   function getLocalStream() {
-    navigator.mediaDevices.getUserMedia({audio: true, video: true})
-        .then((e) => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = e;
-            localStream = e;
-          }
-        })
-        .catch((e) => {
-          console.error(e);
-        })
+    navigator.mediaDevices
+      .getUserMedia({ audio: true, video: true })
+      .then(e => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = e;
+          localStream = e;
+        }
+      })
+      .catch(e => {
+        console.error(e);
+      });
   }
 
   function loginRoom() {
@@ -145,18 +146,17 @@ const App: React.FC = () => {
     });
   }
 
-  rtc.addEventListener('negotiationneeded', (e) => {
-  	console.log('rtc state', rtc.signalingState);
+  rtc.addEventListener('negotiationneeded', e => {
+    console.log('rtc state', rtc.signalingState);
     if (rtc.signalingState !== 'stable') return;
   });
 
-
   async function publishStream() {
-  	if (!localStream) return;
-  	localStream.getTracks().forEach((track) => {
-  	  if (!localStream) return;
-  		rtc.addTrack(track, localStream);
-	  });
+    if (!localStream) return;
+    localStream.getTracks().forEach(track => {
+      if (!localStream) return;
+      rtc.addTrack(track, localStream);
+    });
     if (isPublisher) {
       await createOffer();
     } else {
@@ -165,30 +165,39 @@ const App: React.FC = () => {
   }
 
   async function call() {
-  	isPublisher = true;
-	  await publishStream();
-	  socket.emit('call');
+    isPublisher = true;
+    await publishStream();
+    socket.emit('call');
   }
 
   function playRemote() {
-	  if (!remoteStream) return;
-	  const remoteVideo$ = remoteVideoRef.current;
-	  if (!remoteVideo$) return;
-	  remoteVideo$.srcObject = remoteStream;
+    if (!remoteStream) return;
+    const remoteVideo$ = remoteVideoRef.current;
+    if (!remoteVideo$) return;
+    remoteVideo$.srcObject = remoteStream;
   }
-
 
   return (
     <div className="App">
-      <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)}/>
-      <input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)}/>
+      <input
+        type="text"
+        value={userName}
+        onChange={e => setUserName(e.target.value)}
+      />
+      <input
+        type="text"
+        value={roomName}
+        onChange={e => setRoomName(e.target.value)}
+      />
       <button onClick={handlerGetCamera}>获取摄像头</button>
       <button onClick={getLocalStream}>采集本地视频</button>
       <button onClick={loginRoom}>登录房间</button>
-      <button ref={callBtnRef} onClick={call}>call</button>
+      <button ref={callBtnRef} onClick={call}>
+        call
+      </button>
       <span>{cameraId}</span>
-      <video ref={videoRef} width="500" height="500" autoPlay={true} muted/>
-      <video ref={remoteVideoRef} width="500" height="500" autoPlay={true}/>
+      <video ref={videoRef} width="500" height="500" autoPlay={true} muted />
+      <video ref={remoteVideoRef} width="500" height="500" autoPlay={true} />
     </div>
   );
 };
