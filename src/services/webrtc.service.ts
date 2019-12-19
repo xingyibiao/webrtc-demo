@@ -8,7 +8,7 @@ import 'webrtc-adapter';
 
 import { SOCKET_PATH, SOCKET_URL } from './config';
 import iceServers from './iceServe';
-import { SEND_SDP } from './event.type';
+import { SEND_SDP, CALL, CANDIDATE, LOGIN } from './event.type';
 
 type SocketMsg<T = any> = {
   data: T;
@@ -20,6 +20,7 @@ type CandidateMsg = SocketMsg<RTCPeerConnectionIceEvent>;
 
 export default class RTCClient extends emitter {
   static clientInstance: RTCClient;
+
   static getClientInstance(
     container: HTMLDivElement,
     constraints: MediaStreamConstraints,
@@ -27,6 +28,31 @@ export default class RTCClient extends emitter {
     if (!RTCClient.clientInstance)
       RTCClient.clientInstance = new RTCClient(container, constraints);
     return RTCClient.clientInstance;
+  }
+
+  static socketOptions: SocketIOClient.ConnectOpts = {
+    path: SOCKET_PATH,
+    forceNew: true,
+    reconnection: false,
+    transports: ['websocket'],
+  };
+
+  static setSocketOptions(options: SocketIOClient.ConnectOpts) {
+    RTCClient.socketOptions = options;
+  }
+
+  static socketUrl: string = SOCKET_URL;
+
+  static setScocketUrl(url: string) {
+    RTCClient.socketUrl = this.socketUrl;
+  }
+
+  static rtcConfig: RTCConfiguration = {
+    iceServers,
+  };
+
+  static setRtcConfig(config: RTCConfiguration) {
+    RTCClient.rtcConfig = config;
   }
 
   private socket: SocketIOClient.Socket | null = null;
@@ -80,16 +106,12 @@ export default class RTCClient extends emitter {
         reject('重复init');
         return;
       }
-      this.socket = io(SOCKET_URL, {
-        path: SOCKET_PATH,
-        forceNew: true,
-        reconnection: false,
-        transports: ['websocket'],
-      });
 
-      this.rtc = new RTCPeerConnection({
-        iceServers,
-      });
+      const { socketUrl, socketOptions, rtcConfig } = RTCClient;
+
+      this.socket = io(socketUrl, socketOptions);
+
+      this.rtc = new RTCPeerConnection(rtcConfig);
 
       function checkAllSuccess(): boolean {
         if (that.socketInitSuccess && that.rtcInitSuccess) return true;
@@ -126,14 +148,14 @@ export default class RTCClient extends emitter {
   }
 
   private addSocketListener() {
-    this.socket.on('send_sdp', async (e: SdpMsg) => {
+    this.socket.on(SEND_SDP, async (e: SdpMsg) => {
       const { sender, data } = e;
       console.log('收到sdp', e);
       if (sender === this.userName) return;
       await this.rtc.setRemoteDescription(data);
     });
 
-    this.socket.on('candidate', async (e: CandidateMsg) => {
+    this.socket.on(CANDIDATE, async (e: CandidateMsg) => {
       const { sender, data } = e;
       if (sender === this.userName) return;
       if (!data) {
@@ -146,7 +168,7 @@ export default class RTCClient extends emitter {
       }
     });
 
-    this.socket.on('call', (e: SocketMsg) => {
+    this.socket.on(CALL, (e: SocketMsg) => {
       const { sender } = e;
       if (sender === this.userName) return;
       this.emit('call');
@@ -173,7 +195,7 @@ export default class RTCClient extends emitter {
   public login(roomName: string, userName: string): Promise<string> {
     return new Promise((resolve, reject) => {
       this.socket.emit(
-        'login',
+        LOGIN,
         userName,
         roomName,
         (e: { success: boolean; isPublisher: boolean }) => {
