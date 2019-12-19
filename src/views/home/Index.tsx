@@ -6,8 +6,8 @@ import {Button, Input} from "antd";
 
 import './index.scss';
 
-import iceServers from '../../iceServe';
-import { SOCKET_URL, SOCKET_PATH } from '../../config';
+import iceServers from '../../services/iceServe';
+import { SOCKET_URL, SOCKET_PATH } from '../../services/config';
 import UserInfo from '../../userInfo'
 
 type SdpMsg = SocketMsg<RTCSessionDescription>
