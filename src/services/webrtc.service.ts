@@ -86,13 +86,17 @@ export default class RTCClient extends emitter {
     private constraints: MediaStreamConstraints,
   ) {
     super();
-    this.initContainer();
   }
 
   private initContainer() {
     if (!this.container) return;
     const localVideo$ = document.createElement('video');
     const remoteVideo$ = document.createElement('video');
+    localVideo$.width = 500;
+    localVideo$.height = 500;
+    remoteVideo$.width = 500;
+    remoteVideo$.height = 500;
+
     this.localVideo$ = localVideo$;
     this.remoteVideo$ = remoteVideo$;
     this.container.appendChild(remoteVideo$);
@@ -100,6 +104,8 @@ export default class RTCClient extends emitter {
   }
 
   public init(): Promise<string> {
+    this.initContainer();
+
     const that = this;
     return new Promise((resolve, reject) => {
       if (this.hasInit) {
@@ -124,6 +130,7 @@ export default class RTCClient extends emitter {
       });
 
       this.rtc.addEventListener('connectionstatechange', () => {
+        if (!this.rtc) return;
         const { connectionState } = this.rtc;
         switch (connectionState) {
           case 'connected':
@@ -148,11 +155,14 @@ export default class RTCClient extends emitter {
   }
 
   private addSocketListener() {
-    this.socket.on(SEND_SDP, async (e: SdpMsg) => {
+    // if (!this.socket) return;
+    this?.socket.on(SEND_SDP, async (e: SdpMsg) => {
       const { sender, data } = e;
       console.log('收到sdp', e);
       if (sender === this.userName) return;
-      await this.rtc.setRemoteDescription(data);
+      if (this.rtc) {
+        await this.rtc.setRemoteDescription(data);
+      }
     });
 
     this.socket.on(CANDIDATE, async (e: CandidateMsg) => {
@@ -162,7 +172,7 @@ export default class RTCClient extends emitter {
         return;
       }
       try {
-        await this.rtc.addIceCandidate(data as any);
+        if (this.rtc) await this.rtc.addIceCandidate(data as any);
       } catch (e) {
         console.error(e);
       }
@@ -178,6 +188,7 @@ export default class RTCClient extends emitter {
   }
 
   private addRtcListener() {
+    if (!this.rtc) return;
     this.rtc.addEventListener('track', e => {
       console.log('远端track增加', e.streams);
       const remoteStream = e.streams[0];
@@ -188,12 +199,13 @@ export default class RTCClient extends emitter {
     });
 
     this.rtc.addEventListener('icecandidate', e => {
-      this.socket.emit('candidate', e.candidate);
+      this.socket && this.socket.emit('candidate', e.candidate);
     });
   }
 
   public login(roomName: string, userName: string): Promise<string> {
     return new Promise((resolve, reject) => {
+      if (!this.socket) return reject('socket未连接');
       this.socket.emit(
         LOGIN,
         userName,
@@ -239,7 +251,9 @@ export default class RTCClient extends emitter {
         .getUserMedia(this.constraints)
         .then(stream => {
           this.localStream = stream;
-          this.localVideo$.srcObject = stream;
+          if (this.localVideo$) {
+            this.localVideo$.srcObject = stream;
+          }
           resolve();
         })
         .catch(err => reject(err));
@@ -247,14 +261,15 @@ export default class RTCClient extends emitter {
   }
 
   private createOffer(): Promise<boolean> {
-    if (this.hasPublish) return;
+    if (this.hasPublish) return Promise.resolve(true);
     return new Promise(async (resolve, reject) => {
       try {
+        if (!this.rtc) return reject(false);
         const offer = await this.rtc.createOffer();
         this.hasPublish = true;
         if (offer.sdp) {
           this.rtc.setLocalDescription(offer);
-          this.socket.emit(SEND_SDP, offer);
+          this.socket && this.socket.emit(SEND_SDP, offer);
           resolve(true);
         }
       } catch (e) {
@@ -264,14 +279,15 @@ export default class RTCClient extends emitter {
   }
 
   private createAnswer(): Promise<boolean> {
-    if (this.hasPublish) return;
+    if (this.hasPublish) return Promise.resolve(true);
     return new Promise(async (resolve, reject) => {
       try {
+        if (!this.rtc) return reject(false);
         const answer = await this.rtc.createAnswer();
         this.hasPublish = true;
         if (answer.sdp) {
           this.rtc.setLocalDescription(answer);
-          this.socket.emit(SEND_SDP, answer);
+          this.socket && this.socket.emit(SEND_SDP, answer);
           resolve(true);
         }
       } catch (e) {
@@ -282,11 +298,16 @@ export default class RTCClient extends emitter {
 
   private addTrack(): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (!this.localStream) reject(false);
+      if (!this.localStream) return reject(false);
       this.localStream.getTracks().forEach(track => {
+        if (!this.rtc) return reject(false);
+        if (!this.localStream) return reject(false);
         this.rtc.addTrack(track, this.localStream);
         resolve(true);
       });
     });
   }
+
+  // TODO implement destroy
+  public destroy() {}
 }

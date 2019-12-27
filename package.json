@@ -3,14 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@types/jest": "24.0.20",
-    "@types/node": "12.11.7",
-    "@types/react": "16.9.11",
-    "@types/react-dom": "16.9.3",
     "antd": "^3.25.0",
-    "cross-env": "^6.0.3",
     "eventemitter3": "4.0.0",
-    "node-sass": "^4.13.0",
     "react": "^16.11.0",
     "react-dom": "^16.11.0",
     "react-router-dom": "^5.1.2",
@@ -32,11 +26,7 @@
     "extends": "react-app"
   },
   "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
+    "production": [">0.2%", "not dead", "not op_mini all"],
     "development": [
       "last 1 chrome version",
       "last 1 firefox version",
@@ -47,6 +37,14 @@
     "@types/react-router-dom": "^5.1.2",
     "@types/react-virtualized": "^9.21.5",
     "@types/socket.io-client": "^1.4.32",
-    "@types/webrtc": "^0.0.25"
+    "@types/webrtc": "^0.0.25",
+    "@types/jest": "24.0.20",
+    "@types/node": "12.11.7",
+    "@types/react": "16.9.11",
+    "@types/react-dom": "16.9.3",
+    "customize-cra": "0.9.1",
+    "react-app-rewired": "2.1.5",
+    "node-sass": "^4.13.0",
+    "cross-env": "^6.0.3"
   }
 }
