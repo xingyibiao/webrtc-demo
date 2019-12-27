@@ -15,10 +15,10 @@
     "webrtc-adapter": "^7.3.0"
   },
   "scripts": {
-    "start": "npx react-app-rewired start",
-    "start:prod": "cross-env NODE_ENV=production npx react-app-rewired start",
-    "build": "npx react-app-rewired build",
-    "test": "react-app-rewired test",
+    "start": "npx react-scripts start",
+    "start:prod": "cross-env NODE_ENV=production npx react-scripts start",
+    "build": "npx react-scripts build",
+    "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
   "homepage": "https://www.xingyibiao.com/build",
@@ -42,8 +42,6 @@
     "@types/node": "12.11.7",
     "@types/react": "16.9.11",
     "@types/react-dom": "16.9.3",
-    "customize-cra": "0.9.1",
-    "react-app-rewired": "2.1.5",
     "node-sass": "^4.13.0",
     "cross-env": "^6.0.3"
   }

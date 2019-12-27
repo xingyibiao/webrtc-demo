@@ -155,8 +155,8 @@ export default class RTCClient extends emitter {
   }
 
   private addSocketListener() {
-    // if (!this.socket) return;
-    this?.socket.on(SEND_SDP, async (e: SdpMsg) => {
+    if (!this.socket) return;
+    this.socket.on(SEND_SDP, async (e: SdpMsg) => {
       const { sender, data } = e;
       console.log('收到sdp', e);
       if (sender === this.userName) return;
