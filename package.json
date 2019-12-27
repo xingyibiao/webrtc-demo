@@ -15,10 +15,10 @@
     "webrtc-adapter": "^7.3.0"
   },
   "scripts": {
-    "start": "npx react-scripts start",
-    "start:prod": "cross-env NODE_ENV=production npx react-scripts start",
-    "build": "npx react-scripts build",
-    "test": "react-scripts test",
+    "start": "npx react-app-rewired start",
+    "start:prod": "cross-env NODE_ENV=production npx react-app-rewired start",
+    "build": "npx react-app-rewired build",
+    "test": "react-app-rewired test",
     "eject": "react-scripts eject"
   },
   "homepage": "https://www.xingyibiao.com/build",
