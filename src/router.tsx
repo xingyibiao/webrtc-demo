@@ -15,7 +15,7 @@ export default function() {
   const userInfo = UserInfo.getInfo();
   console.log(userInfo);
   return (
-    <Router>
+    <Router basename="build">
       <Switch>
         <Route path="/" component={Index} exact/>
         <Route path="/login" component={Login} />
