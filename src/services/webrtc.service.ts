@@ -18,6 +18,16 @@ type SocketMsg<T = any> = {
 type SdpMsg = SocketMsg<RTCSessionDescription>;
 type CandidateMsg = SocketMsg<RTCPeerConnectionIceEvent>;
 
+interface ContainerStyleType {
+  width: number,
+  height: number,
+}
+
+const DefaultContainerStyle: ContainerStyleType = {
+  width: 200,
+  height: 200,
+};
+
 export default class RTCClient extends emitter {
   static clientInstance: RTCClient;
 
@@ -75,39 +85,61 @@ export default class RTCClient extends emitter {
 
   private hasInit: boolean = false;
 
-  private socketInitSuccess: boolean = false;
-
-  private rtcInitSuccess: boolean = false;
-
   private hasPublish: boolean = false;
+
+  private readonly containerStyle!: ContainerStyleType;
+
+  private agreeCall: boolean = false;
+
+  private receiveSap: boolean = false;
 
   constructor(
     private container: HTMLDivElement,
     private constraints: MediaStreamConstraints,
+    containerStyle?: ContainerStyleType
   ) {
     super();
+    this.containerStyle = Object.assign({}, DefaultContainerStyle, containerStyle);
   }
 
   private initContainer() {
     if (!this.container) return;
     const localVideo$ = document.createElement('video');
     const remoteVideo$ = document.createElement('video');
-    localVideo$.width = 500;
-    localVideo$.height = 500;
-    remoteVideo$.width = 500;
-    remoteVideo$.height = 500;
+    const { width, height } = this.containerStyle;
+    this.container.setAttribute('style', `position: relative; width: ${width}px; height: ${height}px`);
+    localVideo$.width = width * 0.25;
+    localVideo$.height = height * 0.25;
+    localVideo$.style.background = '#999';
+    localVideo$.style.position = 'absolute';
+    localVideo$.style.bottom = `0`;
+    localVideo$.style.right = `0`;
+    localVideo$.setAttribute('autoPlay', 'autoPlay');
+    localVideo$.setAttribute('mute', 'mute');
+
+    remoteVideo$.width = width;
+    remoteVideo$.height = height;
+    remoteVideo$.style.background = '#000';
+    remoteVideo$.style.position = 'absolute';
+    remoteVideo$.setAttribute('autoPlay', 'autoPlay');
+
 
     this.localVideo$ = localVideo$;
     this.remoteVideo$ = remoteVideo$;
     this.container.appendChild(remoteVideo$);
+    this.container.appendChild(remoteVideo$);
     this.container.appendChild(localVideo$);
   }
 
+  /**
+   * 初始化
+   */
   public init(): Promise<string> {
     this.initContainer();
 
     const that = this;
     return new Promise((resolve, reject) => {
+      console.log('开始init', this.hasInit);
       if (this.hasInit) {
         reject('重复init');
         return;
@@ -119,32 +151,19 @@ export default class RTCClient extends emitter {
 
       this.rtc = new RTCPeerConnection(rtcConfig);
 
-      function checkAllSuccess(): boolean {
-        if (that.socketInitSuccess && that.rtcInitSuccess) return true;
-        return false;
-      }
-
       this.socket.addEventListener('connect', () => {
-        this.socketInitSuccess = true;
-        if (checkAllSuccess()) resolve();
+        resolve();
+      });
+
+      this.rtc.addEventListener('signalingstatechange', (e) => {
+        console.log('signalingstatechange', e);
       });
 
       this.rtc.addEventListener('connectionstatechange', () => {
+        console.log('rtc connectionStateChange');
         if (!this.rtc) return;
         const { connectionState } = this.rtc;
-        switch (connectionState) {
-          case 'connected':
-            this.rtcInitSuccess = true;
-            if (checkAllSuccess()) resolve();
-            break;
-          case 'disconnected':
-          case 'failed':
-            reject();
-            break;
-          case 'closed':
-            console.log('rtc关闭');
-            break;
-        }
+        console.log('connectionState %s', connectionState);
       });
 
       this.socket.addEventListener('error', () => reject());
@@ -154,14 +173,19 @@ export default class RTCClient extends emitter {
     });
   }
 
+  /**
+   * 添加socket监听
+   */
   private addSocketListener() {
     if (!this.socket) return;
     this.socket.on(SEND_SDP, async (e: SdpMsg) => {
       const { sender, data } = e;
       console.log('收到sdp', e);
       if (sender === this.userName) return;
+      this.receiveSap = true;
       if (this.rtc) {
         await this.rtc.setRemoteDescription(data);
+        if (this.agreeCall) this.publishStream();
       }
     });
 
@@ -181,12 +205,15 @@ export default class RTCClient extends emitter {
     this.socket.on(CALL, (e: SocketMsg) => {
       const { sender } = e;
       if (sender === this.userName) return;
-      this.emit('call');
+      this.emit('call', sender);
       this.isPublisher = false;
       this.publishStream();
     });
   }
 
+  /**
+   * 添加rtc监听
+   */
   private addRtcListener() {
     if (!this.rtc) return;
     this.rtc.addEventListener('track', e => {
@@ -203,6 +230,11 @@ export default class RTCClient extends emitter {
     });
   }
 
+  /**
+   * 登录房建
+   * @param roomName
+   * @param userName
+   */
   public login(roomName: string, userName: string): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!this.socket) return reject('socket未连接');
@@ -214,7 +246,7 @@ export default class RTCClient extends emitter {
           if (e.success) {
             this.userName = userName;
             this.roomName = roomName;
-            this.isPublisher = this.isPublisher;
+            this.isPublisher = e.isPublisher;
           } else {
             reject('登录失败');
           }
@@ -225,13 +257,16 @@ export default class RTCClient extends emitter {
     });
   }
 
-  public publishStream(): Promise<string> {
+  /**
+   * 发布流
+   */
+  private publishStream(): Promise<string> {
     return new Promise(async (resolve, reject) => {
       try {
         await this.initLocalStream();
 
         await this.addTrack();
-
+        console.log('isPublisher', this.isPublisher);
         if (this.isPublisher) {
           await this.createOffer();
         } else {
@@ -245,6 +280,29 @@ export default class RTCClient extends emitter {
     });
   }
 
+  /**
+   * 发起通话请求
+   */
+  public call() {
+    if (!this.socket) return;
+    this.socket.emit(CALL, '', (e: SocketMsg) => {
+      console.log('call cb', e);
+      this.isPublisher = true;
+      this.publishStream();
+    });
+  }
+
+  /**
+   * 接受通话请求
+   */
+  public agree() {
+    this.agreeCall = true;
+    if (this.receiveSap) this.publishStream();
+  }
+
+  /**
+   * 初始化本地视频
+   */
   private initLocalStream(): Promise<any> {
     return new Promise((resolve, reject) => {
       navigator.mediaDevices
@@ -260,6 +318,9 @@ export default class RTCClient extends emitter {
     });
   }
 
+  /**
+   * create offer
+   */
   private createOffer(): Promise<boolean> {
     if (this.hasPublish) return Promise.resolve(true);
     return new Promise(async (resolve, reject) => {
@@ -268,7 +329,7 @@ export default class RTCClient extends emitter {
         const offer = await this.rtc.createOffer();
         this.hasPublish = true;
         if (offer.sdp) {
-          this.rtc.setLocalDescription(offer);
+          await this.rtc.setLocalDescription(offer);
           this.socket && this.socket.emit(SEND_SDP, offer);
           resolve(true);
         }
@@ -278,6 +339,9 @@ export default class RTCClient extends emitter {
     });
   }
 
+  /**
+   * create answer
+   */
   private createAnswer(): Promise<boolean> {
     if (this.hasPublish) return Promise.resolve(true);
     return new Promise(async (resolve, reject) => {
@@ -286,16 +350,20 @@ export default class RTCClient extends emitter {
         const answer = await this.rtc.createAnswer();
         this.hasPublish = true;
         if (answer.sdp) {
-          this.rtc.setLocalDescription(answer);
+          await this.rtc.setLocalDescription(answer);
           this.socket && this.socket.emit(SEND_SDP, answer);
           resolve(true);
         }
       } catch (e) {
+        console.error('create answer error', e);
         reject(e);
       }
     });
   }
 
+  /**
+   * 添加track
+   */
   private addTrack(): Promise<boolean> {
     return new Promise((resolve, reject) => {
       if (!this.localStream) return reject(false);
@@ -308,6 +376,22 @@ export default class RTCClient extends emitter {
     });
   }
 
-  // TODO implement destroy
-  public destroy() {}
+  /**
+   * 重置关键状态
+   */
+  private resetState() {
+    this.socket = null;
+    this.rtc = null;
+    this.agreeCall = false;
+    this.isPublisher = false;
+  }
+
+  /**
+   * destroy
+   */
+  public destroy() {
+    if (this.socket) this.socket.close();
+    if (this.rtc) this.rtc.close();
+    this.resetState();
+  }
 }
