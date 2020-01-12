@@ -17,11 +17,7 @@ export default function() {
   return (
     <Router>
       <Switch>
-        {userInfo.userName ? (
-          <Route exact path="/" component={Index} />
-        ) : (
-          <Redirect to="/login" />
-        )}
+        <Route path="/" component={Index} exact/>
         <Route path="/login" component={Login} />
         <Route path="/room/:id" component={Room} />
       </Switch>

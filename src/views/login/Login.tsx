@@ -16,7 +16,7 @@ const Login: React.FC = () => {
 			userName,
 			roomName,
 		});
-		history.push('/');
+		history.push(`/room/${roomName}`);
 		window.location.reload();
 	}
 

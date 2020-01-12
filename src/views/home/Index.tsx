@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import io from 'socket.io-client';
+import { useHistory } from 'react-router-dom';
 import { List } from 'react-virtualized';
 import { Button, Input } from 'antd';
 
@@ -31,6 +32,12 @@ let isAddRtcListener: boolean = false;
 let localMsgList: string[] = [];
 
 const App: React.FC = () => {
+  const history = useHistory();
+  const { userName, roomName } = UserInfo.getInfo();
+
+  if (!userName) {
+    history.replace('/login');
+  }
   const videoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [cameraId, setCameraId] = useState('');
@@ -40,7 +47,6 @@ const App: React.FC = () => {
   const [chatMsg, setChatMsg] = useState('');
   const [onCalling, setOnCalling] = useState(false);
 
-  const { userName, roomName } = UserInfo.getInfo();
 
   function handlerWinResize() {
     const container$ = document.querySelector<HTMLDivElement>('#chat--list');
